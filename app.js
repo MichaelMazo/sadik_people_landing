@@ -56,7 +56,7 @@ function personScreen(person,selectedLens){
     <div class="detail-top"><button data-back>← Назад</button><span id="context-label">${person.name} · ${viewLabel(person.views.length)}</span></div>
     <div class="detail-layout"><aside class="portrait-column">
       <div class="detail-portrait">${portrait(person,'detail-image')}<span id="detail-name">${person.name}</span></div>
-      <h2 id="detail-title">Одна жизнь.<br>${person.views.length===6?'Шесть':'Четыре'} линзы.</h2>
+      <h2 id="detail-title">Одна жизнь.<br>${viewLabel(person.views.length)}.</h2>
       <p class="portrait-note">Эти фрагменты вместе складываются в рассказ о человеке. Каждый открывает свою сторону.</p>
       <div class="lens-menu" id="personal-lenses" aria-label="Линзы этого человека">${menu}</div>
     </aside><section class="story-fragments" aria-label="Рассказ через линзы">
@@ -111,7 +111,7 @@ function render(){
   if(isGallery){
     detail.innerHTML='';
     select('#gallery-title').textContent=current.mode==='people'?'Люди Садика':'Линзы Садика';
-    select('#hint').textContent=current.mode==='people'?'Семь людей. У каждого — свой набор линз.':'Лица под линзой — люди, у которых она есть в тексте.';
+    select('#hint').textContent=current.mode==='people'?`${personLabel(people.length)}. У каждого — свой набор линз.`:'Лица под линзой — люди, у которых она есть в тексте.';
     return;
   }
   detail.innerHTML=current.type==='person'?personScreen(getPerson(current.personId),current.lensId):lensScreen(getLens(current.lensId),current.fromPerson);
@@ -182,4 +182,5 @@ function back(){
 }
 document.addEventListener('keydown',event=>{if(event.key==='Escape')back();});
 motion.addEventListener('change',()=>{if(motion.matches)cancelTransition();});
+select('#site-counts').textContent=`${personLabel(people.length)} · ${people.reduce((sum,person)=>sum+person.views.length,0)} фрагментов · Тексты предоставлены участником проекта.`;
 render();

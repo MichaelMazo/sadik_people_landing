@@ -85,7 +85,7 @@ mark{background:#e0e8be;color:inherit;border-radius:3px;padding:2px 0}
 .fragment-heading{display:flex;align-items:center;gap:15px}
 .fragment-heading .mini-lens{width:36px;height:36px}
 .fragment h3{font-size:27px;font-weight:500;letter-spacing:-.8px;margin:0}
-.fragment-text{font-size:15px;line-height:1.95;margin:22px 0;color:#414c40}
+.fragment-text{font-size:15px;line-height:1.95;margin:22px 0;color:#414c40;white-space:pre-line}
 .fragment-connection{display:flex;align-items:center;gap:15px;margin-top:20px}
 .fragment-connection .text-button{margin:0;text-align:left;line-height:1.7}
 .connection-avatars{display:flex;flex-shrink:0}
