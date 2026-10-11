@@ -14,18 +14,22 @@ const escape = value => String(value).replace(/[&<>"']/g,character=>({'&':'&amp;
 const portrait = (person,className='') => `<img class="${className}" src="${photo(person)}" style="object-position:${person.position}" alt="${escape(person.name)}">`;
 const getPerson = id => people.find(person=>person.id===id);
 const getLens = id => lenses.find(lens=>lens.id===id);
-const participants = lensId => people.filter(person=>person.views.some(view=>view.lens===lensId));
+const viewLenses = view => [view.lens,...(view.additionalLenses||[])];
+const hasLens = (view,lensId) => viewLenses(view).includes(lensId);
+const participants = lensId => people.filter(person=>person.views.some(view=>hasLens(view,lensId)));
 const compareLenses = (leftId,rightId) => participants(rightId).length-participants(leftId).length || getLens(leftId).name.localeCompare(getLens(rightId).name,'ru');
+const personalLenses = person => [...new Set(person.views.flatMap(viewLenses))].sort(compareLenses);
 const orderedViews = person => [...person.views].sort((left,right)=>compareLenses(left.lens,right.lens));
 const countLabel = count => count===1?'1 взгляд':count<5?`${count} взгляда`:`${count} взглядов`;
 const viewLabel = count => count===1?'1 линза':count<5?`${count} линзы`:`${count} линз`;
 const personLabel = count => count===1?'1 человек':count<5?`${count} человека`:`${count} человек`;
-const chips = person => orderedViews(person).map(view=>`<span>${escape(getLens(view.lens).name)}</span>`).join('');
+const chips = person => personalLenses(person).map(lensId=>`<span>${escape(getLens(lensId).name)}</span>`).join('');
 
 for(const person of people){
   const button=document.createElement('button');
   button.dataset.person=person.id;
-  button.innerHTML=`${portrait(person)}<span class="card-story">Через ${viewLabel(person.views.length)}<br>${person.views.map(view=>escape(view.label)).join(' · ')}</span><span class="card-caption"><span class="card-name">${person.name}</span><small>${viewLabel(person.views.length)} ↗</small></span>`;
+  const lensIds=personalLenses(person);
+  button.innerHTML=`${portrait(person)}<span class="card-story">Через ${viewLabel(lensIds.length)}<br>${lensIds.map(lensId=>escape(getLens(lensId).name)).join(' · ')}</span><span class="card-caption"><span class="card-name">${person.name}</span><small>${viewLabel(lensIds.length)} ↗</small></span>`;
   button.onclick=()=>navigate({type:'person',personId:person.id});
   cards.append(button);
 }
@@ -50,34 +54,35 @@ select('#all-lenses').onclick=()=>setGallery('lenses');
 select('.brand').onclick=event=>{event.preventDefault();setGallery('people');};
 function personScreen(person,selectedLens){
   const ordered=orderedViews(person);
-  if(selectedLens)ordered.sort((left,right)=>Number(right.lens===selectedLens)-Number(left.lens===selectedLens));
-  const menu=orderedViews(person).map(view=>`<button data-jump="${view.lens}" data-shared="${view.lens}" aria-pressed="${view.lens===selectedLens}">${escape(view.label)}</button>`).join('');
+  if(selectedLens)ordered.sort((left,right)=>Number(hasLens(right,selectedLens))-Number(hasLens(left,selectedLens)));
+  const lensIds=personalLenses(person);
+  const menu=lensIds.map(lensId=>`<button data-jump="${lensId}" data-shared="${lensId}" aria-pressed="${lensId===selectedLens}">${escape(getLens(lensId).name)}</button>`).join('');
   return `
-    <div class="detail-top"><button data-back>← Назад</button><span id="context-label">${person.name} · ${viewLabel(person.views.length)}</span></div>
+    <div class="detail-top"><button data-back>← Назад</button><span id="context-label">${person.name} · ${viewLabel(lensIds.length)}</span></div>
     <div class="detail-layout"><aside class="portrait-column">
       <div class="detail-portrait">${portrait(person,'detail-image')}<span id="detail-name">${person.name}</span></div>
-      <h2 id="detail-title">Одна жизнь.<br>${viewLabel(person.views.length)}.</h2>
+      <h2 id="detail-title">Одна жизнь.<br>${viewLabel(lensIds.length)}.</h2>
       <p class="portrait-note">Эти фрагменты вместе складываются в рассказ о человеке. Каждый открывает свою сторону.</p>
       <div class="lens-menu" id="personal-lenses" aria-label="Линзы этого человека">${menu}</div>
     </aside><section class="story-fragments" aria-label="Рассказ через линзы">
       <div class="section-heading"><span class="eyebrow">ВСЕ ФРАГМЕНТЫ РАССКАЗА</span><span>${countLabel(person.views.length)}</span></div>
       ${ordered.map(view=>{
-        const lens=getLens(view.lens);
-        const members=participants(view.lens);
-        const others=members.filter(member=>member.id!==person.id);
-        return `<article class="fragment ${selectedLens===view.lens?'is-selected':''}" id="fragment-${view.lens}" data-fragment="${view.lens}" tabindex="-1">
+        return `<article class="fragment ${hasLens(view,selectedLens)?'is-selected':''}" id="fragment-${person.views.indexOf(view)}" data-fragment="${viewLenses(view).join(' ')}" tabindex="-1">
           <div class="fragment-heading"><span class="mini-lens" aria-hidden="true"></span><h3>${escape(view.label)}</h3></div>
           <p class="fragment-text">${escape(view.text)}</p>
-          <div class="fragment-connection"><span class="connection-avatars">${others.map(member=>portrait(member)).join('')}</span>
-          <button class="text-button" data-open-lens="${view.lens}">${others.length?'Эта же линза у других':'Рассмотреть эту линзу'} ↗</button></div>
-          <p class="connection-note">${others.length?others.map(member=>member.name).join(' · '):'В этих текстах эта линза пока встречается только здесь.'}</p>
+          ${viewLenses(view).map(lensId=>{
+            const others=participants(lensId).filter(member=>member.id!==person.id);
+            return `<div class="fragment-connection"><span class="connection-avatars">${others.map(member=>portrait(member)).join('')}</span>
+              <button class="text-button" data-open-lens="${lensId}">${escape(getLens(lensId).name)}: ${others.length?'взгляды других':'рассмотреть линзу'} ↗</button></div>
+              <p class="connection-note">${others.length?others.map(member=>member.name).join(' · '):'В этих текстах эта линза пока встречается только здесь.'}</p>`;
+          }).join('')}
         </article>`;
       }).join('')}
     </section></div>`;
 }
 function lensScreen(lens,fromPerson){
   const members=participants(lens.id);
-  const labels=[...new Set(members.map(person=>person.views.find(view=>view.lens===lens.id).label))];
+  const labels=[...new Set(members.flatMap(person=>person.views.filter(view=>hasLens(view,lens.id)).map(view=>view.label)))];
   return `
     <div class="detail-top"><button data-back>← Назад</button><span id="context-label">${personLabel(members.length)} · одна линза</span></div>
     <div class="hub-heading"><span class="hub-orb" aria-hidden="true"></span><span class="eyebrow">САДИК СМОТРИТ ЧЕРЕЗ РАЗНЫЕ ЛИНЗЫ</span><h2 data-shared="${lens.id}" tabindex="-1">${escape(lens.name)}</h2><p>${escape(lens.question)}</p>
@@ -85,10 +90,10 @@ function lensScreen(lens,fromPerson){
     </div>
     <div class="hub-intro"><span>${members.length>1?'Одна линза — разные ситуации. Читайте рядом.':'Один взгляд в предоставленных текстах. Другие смогут появиться позже.'}</span><span>${countLabel(members.length)}</span></div>
     <div class="perspective-grid">${members.map(person=>{
-      const view=person.views.find(entry=>entry.lens===lens.id);
+      const views=person.views.filter(view=>hasLens(view,lens.id));
       return `<article class="person-perspective ${person.id===fromPerson?'from-person':''}" data-member="${person.id}">
-        <button class="perspective-person" data-open-person="${person.id}">${portrait(person)}<span><strong>${person.name}</strong><small>${escape(view.label)}</small></span><span class="person-arrow">↗</span></button>
-        <p class="fragment-text">${escape(view.text)}</p>
+        <button class="perspective-person" data-open-person="${person.id}">${portrait(person)}<span><strong>${person.name}</strong><small>${escape(lens.name)}</small></span><span class="person-arrow">↗</span></button>
+        ${views.map(view=>`<h3>${escape(view.label)}</h3><p class="fragment-text">${escape(view.text)}</p>`).join('')}
         <button class="text-button" data-open-person="${person.id}">Все линзы: ${person.name} ↗</button>
         <div class="related-chips">${chips(person)}</div>
       </article>`;
@@ -119,8 +124,8 @@ function render(){
   detail.querySelectorAll('[data-jump]').forEach(button=>button.onclick=()=>{
     current.lensId=button.dataset.jump;
     detail.querySelectorAll('[data-jump]').forEach(chip=>chip.setAttribute('aria-pressed',chip===button));
-    detail.querySelectorAll('[data-fragment]').forEach(fragment=>fragment.classList.toggle('is-selected',fragment.dataset.fragment===current.lensId));
-    const target=select('#fragment-'+current.lensId);
+    detail.querySelectorAll('[data-fragment]').forEach(fragment=>fragment.classList.toggle('is-selected',fragment.dataset.fragment.split(' ').includes(current.lensId)));
+    const target=detail.querySelector('[data-fragment~="'+current.lensId+'"]');
     target.scrollIntoView({behavior:motion.matches?'instant':'smooth',block:'start'});
     target.focus({preventScroll:true});
   });
